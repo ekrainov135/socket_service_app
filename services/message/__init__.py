@@ -12,8 +12,6 @@ def authenticate(data_json, auth_mode):
 
 
 def auth_required(func):
-    """ Decorator for functions using login.  """
-
     async def wrapped(self, conn, data_json):
         is_identified = conn.fileno in self.connections
 
@@ -23,8 +21,6 @@ def auth_required(func):
 
 
 class MessageService(Service):
-    """ Chat manager class. Processes requests from the client and stores the chat history in json.  """
-
     DEFAULT_USER = 'anonymous'
 
     def __init__(self, service_id, proto, host=None, port=None, allow_multisession=False, **kwargs):
@@ -34,9 +30,9 @@ class MessageService(Service):
 
         # Protocol method handlers
         self.receivers = {
-            'login': self._transport_login,
+            'connect': self._transport_connect,
             'auth': self._transport_auth,
-            'logout': self._transport_logout,
+            'close': self._transport_close,
             'send': self._transport_send,
             'cmd': self._transport_cmd
         }
@@ -51,9 +47,9 @@ class MessageService(Service):
             # Sending services metadata
             # Waiting for authentication data from client
             data_json = await self.proto.aread(connection, self.loop)
-            if data_json['type'] != 'login':
+            if data_json['type'] != 'connect':
                 return
-            await self._transport_login(connection, data_json)
+            await self._transport_connect(connection, data_json)
 
             # Sending chat history
             data = '\n'.join(['({timestamp}) {user}: {data}'.format(**row) for row in self.history])
@@ -69,7 +65,7 @@ class MessageService(Service):
             pass
         finally:
             if connection.fileno in self.connections:
-                await self._transport_logout(connection)
+                await self._transport_close(connection)
 
     def stop(self):
         self.is_active = False
@@ -79,15 +75,15 @@ class MessageService(Service):
         #self._socket.shutdown(socket.SHUT_RDWR)
         self.proto.server_stop()
 
-    async def _transport_login(self, connection, data_json):
-        """ Processes an incoming login request.  """
+    async def _transport_connect(self, connection, data_json):
+        """ Processes an incoming connect request.  """
 
         data_json['status'] = 'auth'
         data_json['authentication'] = None or ''
 
         self.proto.write(data_json, connection)
-        login_data = await self.proto.aread(connection, self.loop)
-        await self._transport_auth(connection, login_data)
+        connect_data = await self.proto.aread(connection, self.loop)
+        await self._transport_auth(connection, connect_data)
 
     async def _transport_auth(self, connection, data_json):
         username = data_json.get('username') or self.DEFAULT_USER
@@ -110,10 +106,10 @@ class MessageService(Service):
             self.usernames[connection.fileno] = username
             self.connections[connection.fileno] = connection
         else:
-            await self._transport_logout(connection)
+            await self._transport_close(connection)
 
-    async def _transport_logout(self, connection, *args):
-        """ Processes an incoming logout request.  """
+    async def _transport_close(self, connection, *args):
+        """ Processes an incoming close connection request.  """
 
         if connection.fileno in self.connections:
             self.connections.pop(connection.fileno)

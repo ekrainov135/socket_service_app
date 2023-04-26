@@ -17,7 +17,7 @@ class BaseClient(ABC):
         self.auth_mode = None
         self.username = None
 
-    def echo_server(self):
+    def echo(self):
         while True:
             try:
                 response = self.proto.read()
@@ -66,7 +66,7 @@ class MessageServiceClient(BaseClient):
     def run(self, host, port):
         self.proto.connect(host, port)
 
-        request = {'type': 'login'}
+        request = {'type': 'connect'}
 
         self.proto.write(request)
         response = self.proto.read()
@@ -75,15 +75,6 @@ class MessageServiceClient(BaseClient):
             self.auth_mode = response['authentication']
         else:
             raise ConnectionError(response)
-
-    def echo(self):
-        while True:
-            try:
-                response = self.proto.read()
-                if response['type'] in self.handlers:
-                    self.handlers[response['type']](response)
-            except ConnectionError:
-                break
 
     def _send(self, data_json):
         """ Method for handling server responses 'send' type.  """
@@ -107,8 +98,8 @@ class MessageServiceClient(BaseClient):
         else:
             raise ConnectionError(response)
 
-    def logout(self):
-        request = {'type': 'logout'}
+    def close(self):
+        request = {'type': 'close'}
         self.proto.write(request)
 
         # Wait the server closes the connection itself

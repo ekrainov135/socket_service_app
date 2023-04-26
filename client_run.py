@@ -43,7 +43,7 @@ def rum_messanger(cli):
     print(f'= {cli.username} =======\n\n')
 
     loop = asyncio.get_event_loop()
-    loop.run_in_executor(None, cli.echo_server)
+    loop.run_in_executor(None, cli.echo)
 
     while True:
         try:
@@ -53,8 +53,7 @@ def rum_messanger(cli):
             print(f'Error: {e}')
             exit()
         except KeyboardInterrupt:
-            cli.logout()
-            print('logout from server')
+            cli.close()
             exit()
         except Exception as e:
             print('some error')
